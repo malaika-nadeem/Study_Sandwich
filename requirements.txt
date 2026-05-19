@@ -1,13 +1,2 @@
 streamlit
-pdfplumber
-python-docx
-python-pptx
 groq
-python-dotenv
-google-generativeai
-
-
- anyone can run:
-
-pip install -r requirements.txt
-
