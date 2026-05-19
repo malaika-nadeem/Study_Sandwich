@@ -1,12 +1,7 @@
 import streamlit as st
-from dotenv import load_dotenv
 import os
 from groq import Groq
-load_dotenv()
-api_key = os.getenv("GROQ_API_KEY")
-client = Groq(api_key=api_key)
 import json
-
 
 st.set_page_config(page_title="studysandwhich", page_icon="🥪")
 st.markdown("""
@@ -14,21 +9,18 @@ st.markdown("""
 .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
     background-color: #FDF6EC !important;
 }
-
 .stButton button {
     background-color: #A0522D;
     color: white;
     border-radius: 20px;
     border: none;
 }
-
 @keyframes float {
     0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
     10% { opacity: 1; }
     90% { opacity: 1; }
     100% { transform: translateY(-100px) rotate(360deg); opacity: 0; }
 }
-
 .bubble {
     position: fixed;
     font-size: 30px;
@@ -36,7 +28,6 @@ st.markdown("""
     pointer-events: none;
     z-index: 0;
 }
-
 .b1 { left: 5%;  animation-duration: 6s;  animation-delay: 0s;  }
 .b2 { left: 15%; animation-duration: 8s;  animation-delay: 1s;  }
 .b3 { left: 30%; animation-duration: 7s;  animation-delay: 2s;  }
@@ -45,7 +36,6 @@ st.markdown("""
 .b6 { left: 75%; animation-duration: 8s;  animation-delay: 1.5s;}
 .b7 { left: 88%; animation-duration: 7s;  animation-delay: 2.5s;}
 </style>
-
 <div class="bubble b1">🧋</div>
 <div class="bubble b2">🥪</div>
 <div class="bubble b3">🧋</div>
@@ -54,11 +44,16 @@ st.markdown("""
 <div class="bubble b6">🥪</div>
 <div class="bubble b7">🧋</div>
 """, unsafe_allow_html=True)
-st.markdown("""<style>
-.stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
-    background-color: #FDF6EC !important;
-}
-</style>""", unsafe_allow_html=True)
+
+# ✅ API key from Streamlit secrets
+api_key = st.secrets["GROQ_API_KEY"]
+client = Groq(api_key=api_key)
+
+# ✅ Guard against direct page access
+if "text" not in st.session_state:
+    st.warning("Please upload your notes first!")
+    st.switch_page("pages/quiz.py")
+    st.stop()
 
 # unpack from session state
 text = st.session_state["text"]
@@ -88,26 +83,24 @@ with st.spinner("Generating your quiz..."):
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}]
-    )                                              
+    )
     result = response.choices[0].message.content
-    
-   # clean backticks if present
     result = result.strip().replace("```json", "").replace("```", "").strip()
-   # parse JSON
     quiz_data = json.loads(result)
 
 for i, mcq in enumerate(quiz_data["mcqs"]):
     st.write(f"**Q{i+1}: {mcq['question']}**")
     answer = st.radio("Choose:", list(mcq["options"].values()), key=f"mcq_{i}")
+
 for i, sq in enumerate(quiz_data["short_questions"]):
-    st.write(f"**Q{i+1}: {sq['question']}**")  # display the question
-    user_answer = st.text_input("Your answer:", key=f"short_{i}")  # text box for user
+    st.write(f"**Q{i+1}: {sq['question']}**")
+    user_answer = st.text_input("Your answer:", key=f"short_{i}")
+
 st.markdown("---")
 if st.button("Submit Quiz 🥪"):
     score = 0
     total = len(quiz_data["mcqs"]) + len(quiz_data["short_questions"])
-    
-    # check MCQs
+
     st.subheader("MCQ Results:")
     for i, mcq in enumerate(quiz_data["mcqs"]):
         user_ans = st.session_state.get(f"mcq_{i}")
@@ -117,8 +110,7 @@ if st.button("Submit Quiz 🥪"):
             score += 1
         else:
             st.error(f"Q{i+1}: ❌ Wrong! Correct answer: {correct_ans}")
-    
-    # check short questions using AI
+
     st.subheader("Short Question Results:")
     for i, sq in enumerate(quiz_data["short_questions"]):
         user_ans = st.session_state.get(f"short_{i}", "")
@@ -136,13 +128,10 @@ if st.button("Submit Quiz 🥪"):
         if "CORRECT" in feedback.upper():
             st.success(f"Q{i+1}: ✅ {feedback}")
             score += 1
-        if "Blank" in feedback.upper():
-            st.error(f"Q{i+1}:❌{feedback}")  
+        elif "BLANK" in feedback.upper():
+            st.error(f"Q{i+1}: ❌ {feedback}")
         else:
             st.error(f"Q{i+1}: ❌ {feedback}")
 
-    
-    # final score
     st.markdown("---")
     st.subheader(f"🥪 Your Score: {score}/{total}")
-            
